@@ -1,4 +1,4 @@
-name: Deploy Web App
+name: Deploy Web App to Azure
 
 on:
   push:
@@ -12,15 +12,14 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    # This step logs into Azure using the secret you created
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
     - name: Set up Terraform
       uses: hashicorp/setup-terraform@v2
-
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
 
     - name: Terraform Init
       run: terraform init
@@ -28,6 +27,7 @@ jobs:
     - name: Terraform Apply
       run: terraform apply -auto-approve
 
+    # The rest of the steps for Docker follow
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
@@ -40,16 +40,3 @@ jobs:
         context: .
         push: true
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-web-app:latest
-
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }} # You need to get the public IP of your EC2
-        username: ec2-user
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          # Pull the new image and run the container
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/my-web-app:latest
-          docker stop webapp || true
-          docker rm webapp || true
-          docker run -d --name webapp -p 80:80 ${{ secrets.DOCKERHUB_USERNAME }}/my-web-app:latest
