@@ -1,4 +1,4 @@
-name: Deploy Web App to Azure
+name: CI/CD to Local WSL
 
 on:
   push:
@@ -6,37 +6,21 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  build-and-deploy-local:
+    # This tells GitHub to send the job to your local machine
+    runs-on: self-hosted
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # This step logs into Azure using the secret you created
-    - name: Login to Azure
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Build Docker image
+      run: docker build -t my-web-app:latest .
 
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v2
-
-    - name: Terraform Init
-      run: terraform init
-
-    - name: Terraform Apply
-      run: terraform apply -auto-approve
-
-    # The rest of the steps for Docker follow
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-web-app:latest
+    - name: Deploy Docker container
+      run: |
+        # Stop and remove the old container if it exists
+        docker stop webapp || true
+        docker rm webapp || true
+        # Run the new container
+        docker run -d --name webapp -p 8080:80 my-web-app:latest
